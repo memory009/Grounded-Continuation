@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Secrets / local config
+.env
+.env.*
+*.key
+
+# Third-party benchmarks (not redistributed) and generated results
+datasets_cache/
+experiments/results/
+*.bak*
+*.zip
