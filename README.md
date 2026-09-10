@@ -3,7 +3,7 @@
 Qisong He, Jinwei Hu, Xinmiao Huang, Changshun Wu, Yi Dong and Xiaowei Huang
 School of Computer Science & Informatics, University of Liverpool
 
-Paper: arXiv link to follow.
+Paper: https://arxiv.org/abs/2605.14175
 
 A conversation establishes things as it goes, and later turns can retract
 them. An LLM that answers from the raw transcript, or from a retrieval window
