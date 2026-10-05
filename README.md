@@ -1,10 +1,6 @@
 # Grounded Continuation: Runtime Verifier — Code Release
 
-<video controls width="100%">
-  <source src="https://raw.githubusercontent.com/memory009/Grounded-Continuation/main/grounded-continuation-demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-  <a href="https://raw.githubusercontent.com/memory009/Grounded-Continuation/main/grounded-continuation-demo.mp4">Download the demo video</a>.
-</video>
+https://github.com/user-attachments/assets/f913041d-4215-40a1-ae6f-1f683b610580
 
 Code accompanying the paper
 **"Grounded Continuation: A Linear-Time Runtime Verifier for LLM Conversations"**.
