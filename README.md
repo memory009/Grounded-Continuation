@@ -1,7 +1,9 @@
 # Grounded Continuation: Runtime Verifier — Code Release
 
-<video src="./grounded-continuation-demo.mp4" controls width="100%">
-  Your browser does not support the video tag. [Download the demo video](./grounded-continuation-demo.mp4).
+<video controls width="100%">
+  <source src="https://raw.githubusercontent.com/memory009/Grounded-Continuation/main/grounded-continuation-demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+  <a href="https://raw.githubusercontent.com/memory009/Grounded-Continuation/main/grounded-continuation-demo.mp4">Download the demo video</a>.
 </video>
 
 Code accompanying the paper
