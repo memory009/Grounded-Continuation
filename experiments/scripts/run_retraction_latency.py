@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-E4 Panel A: Retraction Latency Microbenchmark (revised)
+Retraction latency microbenchmark
 
-Empirically validates Proposition 2.2's analytical claim that the verifier's
+Empirically validates the complexity bound's claim that the verifier's
 Affected(p) operation scales with |Args_t| (the active dependency-graph size),
 while a baseline that re-reads history scales with K (the number of turns).
 
@@ -24,7 +24,7 @@ Two cost metrics per regime:
 This script is fully model-free; no LLM is required.
 
 Usage:
-    python e4_retraction_latency.py --output e4_results.json
+    python experiments/scripts/run_retraction_latency.py --output retraction_latency.json
 """
 
 import argparse
@@ -37,7 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import os as _os
-sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '..', '..')))  # single source of truth: repo-root engine
+sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '..', '..')))
 from symbolic_engine import EpistemicEngine, EngineEvent  # noqa: E402
 
 
@@ -286,7 +286,7 @@ def run_regime(name: str, builder, Ks: list[int], n_queries: int,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="e4_results.json")
+    parser.add_argument("--output", default="retraction_latency.json")
     parser.add_argument("--Ks", default="13,26,50,100,200,500,1000,2000")
     parser.add_argument("--n-queries", type=int, default=200)
     parser.add_argument("--seeds", default="0,1,2,3,4")
@@ -296,7 +296,7 @@ def main():
     Ks = [int(x) for x in args.Ks.split(",")]
     seeds = [int(x) for x in args.seeds.split(",")]
 
-    print("E4 Panel A: Retraction Latency Microbenchmark (revised)")
+    print("Retraction latency microbenchmark")
     print(f"  Ks = {Ks}")
     print(f"  seeds = {seeds}")
     print(f"  n_queries per (K, seed) = {args.n_queries}")
@@ -315,7 +315,7 @@ def main():
     )
 
     out = {
-        "experiment": "E4 Panel A: Retraction Latency Microbenchmark",
+        "experiment": "Retraction latency microbenchmark",
         "Ks": Ks,
         "seeds": seeds,
         "n_queries_per_seed": args.n_queries,

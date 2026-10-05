@@ -63,7 +63,7 @@ def main():
     ap.add_argument("--model", default="gpt-4o")
     ap.add_argument("--base-url", default="https://api.openai.com/v1/chat/completions")
     ap.add_argument("--api-key-env", default="OPENAI_API_KEY")
-    ap.add_argument("--data", default=os.path.join(REPO, "datasets_cache", "recon"))
+    ap.add_argument("--data", default=os.path.join(REPO, "data", "recon"))
     ap.add_argument("--mode", choices=["chain", "full"], default="chain",
                     help="chain: isolated chain (~500 tok); full: entire skeleton (RECON oracle setting)")
     ap.add_argument("--out", default=None)

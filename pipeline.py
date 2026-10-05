@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 End-to-End Epistemic Pipeline
-Grounded Continuation runtime verifier (ICLR 2027 submission)
 
 This module provides the full LLM-to-Engine pipeline:
   1. Feed any conversation turn-by-turn
@@ -11,7 +10,7 @@ This module provides the full LLM-to-Engine pipeline:
 
 This bridges the gap between the classification experiments
 (run_experiments.py) and a deployable system. It is the
-"LLM Interpreter" component from Figure 1.
+"LLM Interpreter" component of the architecture.
 
 Usage:
     # As a library
@@ -115,7 +114,7 @@ Rules:
 """
 
 
-# Ablated classification prompt (ablation, --ablate-layers
+# Ablated classification prompt (--ablate-layers
 # del_awareness): the DEL plausibility layer (Support = soft plausibility
 # upgrade) and the awareness layer (Expand-Awareness) are removed from the
 # extraction interface. What remains is the argument/dependency skeleton:

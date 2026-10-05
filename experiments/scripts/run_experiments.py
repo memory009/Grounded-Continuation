@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Reproducibility Script — Grounded Continuation classification experiment
-ICLR 2027 submission
+Reproducibility script for the per-utterance classification experiments.
 
 Runs all classification experiments and reports results.
 

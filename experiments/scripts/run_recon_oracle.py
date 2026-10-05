@@ -96,7 +96,7 @@ def score_mcq(x, skel, aff, owner):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default=os.path.join(REPO, "datasets_cache", "recon"))
+    ap.add_argument("--data", default=os.path.join(REPO, "data", "recon"))
     ap.add_argument("--out", default=os.path.join(REPO, "experiments", "results", "recon", "oracle_results.json"))
     a = ap.parse_args()
 

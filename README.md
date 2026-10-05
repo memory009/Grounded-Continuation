@@ -1,185 +1,193 @@
-# Grounded Continuation: A Linear-Time Runtime Verifier for LLM Conversations
+# Grounded Continuation: Runtime Verifier — Code Release
 
-Qisong He, Jinwei Hu, Xinmiao Huang, Changshun Wu, Yi Dong and Xiaowei Huang
-School of Computer Science & Informatics, University of Liverpool
+Code accompanying the paper
+**"Grounded Continuation: A Linear-Time Runtime Verifier for LLM Conversations"**.
 
-Paper: https://arxiv.org/abs/2605.14175
-
-A conversation establishes things as it goes, and later turns can retract
-them. An LLM that answers from the raw transcript, or from a retrieval window
-over it, keeps using premises that the conversation has already given up. This
-repository contains the runtime verifier from the paper: an LLM Interpreter
-maps each utterance to one of eight epistemic operations, and a symbolic
-engine maintains a dependency map that records what every commitment rests on.
-At each turn the engine checks whether the next output still traces back to
-commitments in good standing, and answers retraction queries in time linear in
-the map's size.
-
-**What you get**
-
-- **Accuracy where premises get superseded.** On ReviseQA and the
-  fact-consolidation split of MemoryAgentBench, the verifier leads a
-  budget-matched transcript-retrieval baseline across five QA models and lifts
-  MemoryAgentBench single-hop accuracy from 0.46–0.95 to 0.93–0.98. With the
-  verifier, a 7B QA model overtakes unaided GPT-4o.
-- **Per-query cost independent of conversation length.** Prompts stay near
-  0.8k tokens where full context reaches 114k, and a retraction query runs in
-  under a microsecond at 2000 turns.
-- **Guarantees on the dependency map.** The active set is conflict-free at
-  every turn, retracting a premise removes exactly its dependents, and both the
-  grounding check and the retraction query are linear time.
+The repository contains the symbolic engine, the LLM Interpreter pipeline and
+one runner per experiment in the paper, together with the recorded GPT-4o
+Interpreter outputs of the end-to-end runs. Result files are not included;
+every runner regenerates its outputs under `experiments/results/`.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `symbolic_engine.py` | Reference engine: dependency map, standing labels, `Verify` walk, `Affected*` retraction query. No API key needed. |
-| `pipeline.py` | LLM Interpreter: classifies each utterance into an operation and applies it to the engine. |
-| `benchmark_adapter.py` | Loaders, prompt construction and scoring for ReviseQA, MemoryAgentBench and RECON. |
-| `verify_experiment.py` | Direct verifier test harness over the 50-item test set in `experiments/e2_verify/`. |
-| `experiments/scripts/`, `experiments/e5_robustness/` | One runner per experiment in the paper. |
-| `experiments/prompts/` | The three classification prompt conditions (Minimal, Definitions, State-augmented). |
-| `symbolic_engine.jsx` | Browser demo of the engine with step-through and a counterfactual panel. |
+| `symbolic_engine.py` | Reference engine: dependency map, standing labels, `Affected` and `Affected*` queries. Deterministic, no API key. |
+| `pipeline.py` | LLM Interpreter pipeline and the shared LLM call. |
+| `benchmark_adapter.py` | ReviseQA adapter: scenario loading, engine state under the benchmark's edits, QA prompt, closed-form scoring. |
+| `experiments/scripts/` | One runner per experiment (table below). |
+| `experiments/cache/` | Recorded GPT-4o Interpreter outputs, read by the end-to-end arms (table below). |
 
-Runners are launched from the repository root and write under
-`experiments/results/` (git-ignored).
+## Environment
 
-## Setup
+Tested with Python 3.11, PyTorch 2.10 (CUDA 12.8) and vLLM 0.19.1 on a single
+NVIDIA A100 40 GB. Any GPU that holds a 14B model in bfloat16 is sufficient.
 
-Python 3.10 or later.
+### 1. Python packages
 
 ```bash
+conda create -n gc python=3.11 -y
+conda activate gc
 pip install -r requirements.txt
-python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+pip install vllm==0.19.1          # only needed to serve the open-weight models
 ```
 
-Closed models are called through `OPENAI_API_KEY` (GPT-4o, GPT-4o-mini) and
-`ANTHROPIC_API_KEY` (Claude, classification experiment only). Open-weight QA
-models (Qwen2.5-7B/14B-Instruct, Gemma-3-12B-it, Llama-3.1-8B-Instruct) are
-served with vLLM behind an OpenAI-compatible endpoint. One 40 GB GPU is enough
-for every model used.
+`requirements.txt` covers every runner. `torch` and `transformers` are used
+only by the BEAM dense retriever.
+
+### 2. API keys
 
 ```bash
-vllm serve Qwen/Qwen2.5-7B-Instruct --port 8000
-# runners then take --base-url http://localhost:8000/v1/chat/completions
+export OPENAI_API_KEY=...         # GPT-4o (Interpreter, QA), GPT-4o-mini (QA)
+export ANTHROPIC_API_KEY=...      # Claude Sonnet 4, classification experiment only
+export VLLM_API_KEY=dummy         # any value; local vLLM endpoints do not check it
 ```
 
-### Datasets
+Which keys a run needs depends on the models chosen. The engine, the latency
+benchmark and `run_recon_oracle.py` need none. With the recorded Interpreter
+outputs in `experiments/cache/`, the end-to-end arms need no OpenAI key when
+the QA model is served locally.
 
-The benchmarks are not redistributed here. Download them from their authors
-and place them under `datasets_cache/`:
+### 3. Serving the open-weight models
 
-| Benchmark | Source | Location |
-|---|---|---|
-| ReviseQA | https://github.com/ChadiHelwe/reviseqa | `datasets_cache/reviseqa/` (so that `datasets_cache/reviseqa/reviseqa_data/nl/verified/ex_*.json` exist) |
-| MemoryAgentBench | https://huggingface.co/datasets/ai-hyz/MemoryAgentBench, file `data/Conflict_Resolution-00000-of-00001.parquet` | `datasets_cache/memoryagentbench/data/` |
-| RECON | https://anonymous.4open.science/r/RECON-Bench (link given in the RECON paper) | `datasets_cache/recon/<domain>/case_*/skeleton.json` and `questions.json` |
+Open-weight models are served with vLLM behind an OpenAI-compatible endpoint,
+one model per GPU:
 
 ```bash
-git clone https://github.com/ChadiHelwe/reviseqa datasets_cache/reviseqa
-huggingface-cli download ai-hyz/MemoryAgentBench --repo-type dataset \
-    --include "data/Conflict_Resolution-*.parquet" --local-dir datasets_cache/memoryagentbench
+# QA models and open Interpreters
+vllm serve Qwen/Qwen2.5-7B-Instruct   --port 8000 --max-model-len 16384 --dtype bfloat16 --gpu-memory-utilization 0.90
+vllm serve Qwen/Qwen2.5-14B-Instruct  --port 8002 --max-model-len 16384 --dtype bfloat16 --gpu-memory-utilization 0.90
+vllm serve unsloth/gemma-3-12b-it     --port 8003 --max-model-len 16384 --dtype bfloat16 --gpu-memory-utilization 0.90
+vllm serve meta-llama/Llama-3.1-8B-Instruct --port 8004 --max-model-len 16384 --dtype bfloat16 --gpu-memory-utilization 0.90
+# BEAM judge
+vllm serve Qwen/Qwen2.5-32B-Instruct-AWQ --port 8001 --max-model-len 8192 --gpu-memory-utilization 0.90
 ```
+
+Runners take the endpoint as `--base-url http://localhost:<port>/v1/chat/completions`
+together with `--model <name>` (`--qa-base-url` / `--qa-model` and
+`--judge-base-url` / `--judge-model` for BEAM). For OpenAI models pass
+`--base-url https://api.openai.com/v1/chat/completions --api-key-env OPENAI_API_KEY`.
+The BEAM retriever `BAAI/bge-small-en-v1.5` is downloaded from Hugging Face on
+first use and runs on CPU.
+
+### 4. Data
+
+Third-party benchmarks are not included. Place them under `data/` as released
+by their authors:
+
+```
+data/reviseqa/reviseqa_data/nl/verified/                          # ReviseQA, 930 verified scenarios (github.com/ChadiHelwe/reviseqa)
+data/memoryagentbench/Conflict_Resolution-00000-of-00001.parquet  # MemoryAgentBench FactConsolidation (Hugging Face: ai-hyz/MemoryAgentBench)
+data/beam/100K-00000-of-00001.parquet                             # BEAM 100K split (Hugging Face: Mohammadta/BEAM)
+data/recon/{medical,finance}/case_*/                              # RECON case skeletons and questions
+```
+
+The data paths can also be set through `RQ_DATA_DIR`, `CR_DATA` (or `--data`),
+`BEAM_DATA`, and `--data` for the RECON runners.
 
 ## Quick start (no GPU, no API key)
 
 ```bash
-python symbolic_engine.py                                              # Phase 2 scenario: dependency map, retraction queries, Affected* answers
-python experiments/scripts/e4_retraction_latency.py --output e4.json   # retraction latency from 13 to 2000 turns
+python symbolic_engine.py                                   # Phase 2 dependency map, retraction queries, Affected* answers
+python experiments/scripts/run_retraction_latency.py        # latency scaling
+python experiments/scripts/run_recon_oracle.py              # RECON: one-step Affected vs Affected* (needs data/recon)
 ```
 
-## Experiments
+## Recorded Interpreter outputs
 
-Each runner produces every arm of the corresponding table from the same QA
-model, the same prompt shape and temperature 0; the `--arms` flag selects
-which. Baselines and the verifier therefore come from one command.
+The end-to-end arms read decisions that the GPT-4o Interpreter recorded, so
+they run with the QA model only. Deleting a file re-runs the Interpreter with
+the runner in the last column, at the cost of the GPT-4o calls.
 
-**ReviseQA.** `two_arm` produces the LLM-only baseline and the verifier with
-benchmark-native updates, `transcript_rag` the budget-matched TF-IDF baseline.
-Add `--max-scenarios 10` for a smoke run.
+| File under `experiments/cache/` | Read by | Produced by |
+|---|---|---|
+| `reviseqa_interp/interp_shard{0..3}.json` (per-edit ops) | `run_reviseqa_multimodel.py --arms e2e_replay` | `run_reviseqa_interp_full.py --shard-index {0..3}` |
+| `memagentbench_cr/e2e_ingest_{6k,32k}.json` (supersession decisions) | `run_memagentbench_cr_e2e.py --phase qa`, `run_cr_e2e_dep.py` | `run_memagentbench_cr_e2e.py --phase ingest` |
+| `beam_ingest/gpt-4o_final_ua/conv_{1..20}.json` (extracted statements and decisions) | `run_beam.py qa --ingest-tag gpt-4o_final_ua` | `run_beam.py ingest --ingest-tag gpt-4o_final_ua` |
 
-```bash
-python experiments/scripts/run_reviseqa_multimodel.py \
-    --tag qwen2.5-7b --model Qwen/Qwen2.5-7B-Instruct \
-    --base-url http://localhost:8000/v1/chat/completions \
-    --arms two_arm transcript_rag
-```
+## Running the experiments
 
-For the end-to-end arm a GPT-4o Interpreter extracts every update from raw
-text. The Interpreter pass is sharded and cached, then replayed for any QA
-model at no further Interpreter cost:
+All runners are launched from the repository root and write under `experiments/results/`.
+
+### ReviseQA
 
 ```bash
-for i in 0 1 2 3; do
-  python experiments/scripts/run_reviseqa_interp_full.py --num-shards 4 --shard-index $i
-done
 python experiments/scripts/run_reviseqa_multimodel.py --tag qwen2.5-7b \
     --model Qwen/Qwen2.5-7B-Instruct --base-url http://localhost:8000/v1/chat/completions \
-    --arms e2e_replay
+    --arms two_arm transcript_rag e2e_replay
 ```
 
-**MemoryAgentBench fact consolidation.** By default one run produces the
-long-context baseline (`llm_full`, raw fact stream tail-truncated to the QA
-budget), the TF-IDF top-50 baseline over the full stream (`tr`) and the
-verifier (`verifier`) for all eight variants. Add `--variants sh_6k
---max-questions 10` for a smoke run.
+`two_arm` produces LLM-only and verifier (native), `transcript_rag` produces RAG
+(TF-IDF, top-22), and `e2e_replay` produces verifier (end-to-end) from the
+recorded Interpreter ops.
+
+### MemoryAgentBench FactConsolidation
+
+The engine ingests the stream one observation per fact and retracts a record
+when a later fact carries the same key. The verifier arm selects the active
+records linked to the entities in the question and registers them as the
+question's dependency set. `--check-only` verifies the engine state and
+selection without calling a model.
 
 ```bash
-python experiments/scripts/run_memagentbench_cr.py \
-    --tag qwen2.5-7b --model Qwen/Qwen2.5-7B-Instruct \
-    --base-url http://localhost:8000/v1/chat/completions
+V="sh_6k mh_6k sh_32k mh_32k sh_64k mh_64k sh_262k mh_262k"
+M="--model Qwen/Qwen2.5-7B-Instruct --base-url http://localhost:8000/v1/chat/completions --tag qwen2.5-7b"
+python experiments/scripts/run_memagentbench_cr.py $M --variants $V         # LLM-only, RAG, verifier + TF-IDF
+python experiments/scripts/run_cr_engine_native.py $M --variants $V         # verifier (native)
+# end-to-end, over the recorded GPT-4o ingestion of the 6K and 32K streams
+python experiments/scripts/run_memagentbench_cr_e2e.py --phase qa --variants sh_6k mh_6k sh_32k mh_32k \
+    --qa-model Qwen/Qwen2.5-7B-Instruct --qa-base-url http://localhost:8000/v1/chat/completions --tag qwen2.5-7b
+python experiments/scripts/run_cr_e2e_dep.py $M --variants sh_6k mh_6k sh_32k mh_32k
 ```
 
-For the end-to-end arm the Interpreter decides, fact by fact, which active
-fact the new one supersedes; ingestion is cached and reused by the QA phase:
+For GPT-4o / GPT-4o-mini pass `--model gpt-4o --base-url https://api.openai.com/v1/chat/completions --api-key-env OPENAI_API_KEY`.
+
+### BEAM
+
+`run_beam.py` has four phases (`ingest`, `qa`, `judge`, `report`), all resumable.
+The dense retriever (bge-small-en-v1.5) needs `torch` and `transformers`.
 
 ```bash
-python experiments/scripts/run_memagentbench_cr_e2e.py --phase ingest --lengths 6k 32k
-python experiments/scripts/run_memagentbench_cr_e2e.py --phase qa \
-    --variants sh_6k mh_6k sh_32k mh_32k \
-    --qa-model Qwen/Qwen2.5-7B-Instruct --qa-base-url http://localhost:8000/v1/chat/completions
+C="--convs $(seq -s ' ' 1 20)"
+# 1) GPT-4o Interpreter ingestion; recorded in experiments/cache/beam_ingest/gpt-4o_final_ua, so this step can be skipped
+python experiments/scripts/run_beam.py ingest $C --ingest-tag gpt-4o_final_ua \
+    --max-facts 20 --value-change-mode annotate --decision-batching none --speaker-rule user-authority
+
+# 2) QA, per model (example: Qwen2.5-7B served on :8000)
+QA="--qa-model Qwen/Qwen2.5-7B-Instruct --qa-base-url http://localhost:8000/v1/chat/completions"
+COMMON="$C --ingest-tag gpt-4o_final_ua --top-k 100 --retriever dense --annotate changed"
+python experiments/scripts/run_beam.py qa $COMMON $QA --tag qwen2.5-7b \
+    --arms full --ctx-char-budget 48000           # LLM-only; 440000 for GPT-4o(-mini)
+python experiments/scripts/run_beam.py qa $COMMON $QA --tag qwen2.5-7b \
+    --arms tr verifier_src                        # RAG and verifier
+
+# 3) judge (Qwen2.5-32B-Instruct-AWQ on :8001) and per-ability report
+python experiments/scripts/run_beam.py judge --tag qwen2.5-7b \
+    --judge-model Qwen/Qwen2.5-32B-Instruct-AWQ --judge-base-url http://localhost:8001/v1/chat/completions
+python experiments/scripts/run_beam.py report --tag qwen2.5-7b
 ```
 
-For a closed QA model pass `--model gpt-4o --base-url
-https://api.openai.com/v1/chat/completions --api-key-env OPENAI_API_KEY`. The
-end-to-end arms need `OPENAI_API_KEY` for the Interpreter.
+For GPT-4o / GPT-4o-mini add `--api-key-env OPENAI_API_KEY` and point
+`--qa-base-url` at `https://api.openai.com/v1/chat/completions`. The RAG and
+verifier arms are repeated three times under different `--tag` values.
 
-The remaining experiments in the paper (Interpreter classification, the direct
-verifier test, RECON soundness, dependency-extraction ablations, the noise
-diagnostic, cost accounting) each have their own runner under
-`experiments/`; see the usage block at the top of each file.
-
-## Using the verifier on your own conversation
-
-Run the Interpreter and the engine end-to-end over a transcript given as a
-JSON list of `{"speaker": ..., "text": ...}` objects, then query which
-commitments a retraction would take down:
+### Interpreter classification
 
 ```bash
-python pipeline.py --conversation my_conversation.json --all-queries \
-    --backend openai --model gpt-4o --base-url https://api.openai.com/v1/chat/completions
+python experiments/scripts/run_experiments.py --runs 5 --save cls_claude.json          # Claude Sonnet 4
+python experiments/scripts/run_experiments.py --backend openai --model gpt-4o \
+    --base-url https://api.openai.com/v1/chat/completions --save cls_gpt4o.json
+python experiments/scripts/run_experiments.py --backend openai --model Qwen/Qwen2.5-7B-Instruct \
+    --base-url http://localhost:8000/v1/chat/completions --save cls_qwen7b.json
 ```
 
-The engine can also be driven directly, without any LLM:
+The Phase 2 and Phase 3 scenarios, ground truth and the three prompt conditions
+are embedded in the script.
 
-```python
-from symbolic_engine import EpistemicEngine
+### RECON
 
-e = EpistemicEngine()
-e.observe("o1", "Payment errors started at 02:15", turn="T1", speaker="Carol")
-e.hypothesize("h1", "The Redis connection pool is exhausted", turn="T2", speaker="Bob", explains=["o1"])
-e.hypothesize("h2", "Auth failures are caused by the Redis outage", turn="T3", speaker="Alice", depends_on=["h1"])
-
-e.get_affected_closure("h1")            # ['h2']: what would lose support if h1 fell
-e.undermine("h1", "Redis metrics are healthy", turn="T4", speaker="Carol")
-e.retract_assumption("h1")              # h2 is flagged as depending on a retracted premise
-print(e.get_state_summary())
+```bash
+python experiments/scripts/run_recon_oracle.py                   # one-step Affected vs Affected*
+python experiments/scripts/run_recon_llm_oracle.py --mode chain  # GPT-4o, isolated chain
+python experiments/scripts/run_recon_llm_oracle.py --mode full   # GPT-4o, full skeleton
 ```
-
-## License
-
-The code is released under the MIT License (full text in `LICENSE`). You may
-use, copy, modify and redistribute it, including in commercial products, as
-long as the copyright and permission notice stays with the code. It comes
-without warranty. The authored 50-item test set in `experiments/e2_verify/`
-is released under CC BY 4.0: reuse it freely with attribution to the paper.

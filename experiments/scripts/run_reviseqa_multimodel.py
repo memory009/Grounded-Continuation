@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """ReviseQA multi-model sweep: run any of the four arms for one QA model.
 
-Arms (same protocol as the published Qwen2.5-7B runs, one output file
-per arm so the existing analysis code keeps working):
+Arms (one output file per arm):
 
   two_arm       LLM-only baseline + engine (benchmark-native updates), the
                 original evaluate_reviseqa_scenario chain
@@ -10,7 +9,7 @@ per arm so the existing analysis code keeps working):
   transcript_rag  TF-IDF top-k=22 over the post-edit context
                 -> records with transcript_rag_trace
   e2e_replay    end-to-end arm: the GPT-4o Interpreter's per-step ops are
-                REPLAYED from the cached shards of the published run
+                REPLAYED from the shards written by run_reviseqa_interp_full.py
                 (experiments/results/reviseqa_interp_full/interp_shard*.json),
                 so a new QA model costs no Interpreter calls
                 -> records with interp_trace
@@ -50,11 +49,9 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Default is the original server path; override with RQ_PROJECT_DIR so the
-# script also runs from a local checkout (the imports below need it set
-# before argparse runs).
-PROJECT_DIR = os.environ.get("RQ_PROJECT_DIR",
-                             ".")
+# Repository root; override with RQ_PROJECT_DIR (the imports below need it
+# set before argparse runs).
+PROJECT_DIR = os.environ.get("RQ_PROJECT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_DIR)
 sys.path.insert(0, os.path.join(PROJECT_DIR, "experiments", "scripts"))
 
@@ -76,14 +73,16 @@ from benchmark_adapter import (  # noqa: E402
     REVISEQA_PROMPT_TEMPLATE,
 )
 
-DATA_DIR = os.environ.get(
-    "RQ_DATA_DIR",
-    "datasets_cache/reviseqa/reviseqa_data/nl/verified")
+DATA_DIR = os.environ.get("RQ_DATA_DIR", os.path.join(PROJECT_DIR, "data", "reviseqa", "reviseqa_data", "nl", "verified"))
 REFERENCE_RUN = os.path.join(
     PROJECT_DIR, "experiments/results/reviseqa/"
     "reviseqa_full_qwen7b_explicit_no_corr_no_reasoning.json")
-INTERP_CACHE_DIR = os.path.join(
-    PROJECT_DIR, "experiments/results/reviseqa_interp_full")
+# Recorded GPT-4o Interpreter ops (shipped). If absent, the shards written by
+# run_reviseqa_interp_full.py are read instead.
+INTERP_CACHE_DIR = os.path.join(PROJECT_DIR, "experiments/cache/reviseqa_interp")
+if not glob.glob(os.path.join(INTERP_CACHE_DIR, "interp_shard*.json")):
+    INTERP_CACHE_DIR = os.path.join(
+        PROJECT_DIR, "experiments/results/reviseqa_interp_full")
 OUT_ROOT = os.path.join(PROJECT_DIR, "experiments/results/reviseqa_multimodel")
 
 ARMS = ("two_arm", "transcript_rag", "e2e_replay")
@@ -405,17 +404,16 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     scenarios = load_reviseqa(DATA_DIR, max_scenarios=args.max_scenarios)
+    ids = [s["id"] for s in scenarios]
     if os.path.isfile(REFERENCE_RUN):
         ref = json.load(open(REFERENCE_RUN))
         ref_ids = ref.get("completed_scenario_ids", [])
-        ids = [s["id"] for s in scenarios]
         if ids != ref_ids[:len(ids)]:
             print("ERROR: scenario set/order mismatch vs reference run.")
             sys.exit(2)
         print(f"Loaded {len(scenarios)} scenarios (order verified vs reference)")
     else:
-        print(f"Loaded {len(scenarios)} scenarios (no reference run at "
-              f"{REFERENCE_RUN}; order check skipped)")
+        print(f"Loaded {len(scenarios)} scenarios")
     print(f"model={args.model} url={args.base_url} workers={args.workers} "
           f"max_tokens={os.environ.get('REVISEQA_MAX_TOKENS', '800')}")
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """ReviseQA interpreter-in-the-loop FULL run (930 scenarios, sharded).
 
-Identical config to the 15-scenario smoke
-(experiments/scripts/run_reviseqa_interp_smoke.py /
- experiments/results/reviseqa_interp_smoke/):
-  - Interpreter: gpt-4o (api.openai.com, OPENAI_API_KEY from .env.local),
+Configuration:
+  - Interpreter: gpt-4o (api.openai.com, OPENAI_API_KEY from the environment),
     input = engine's tracked premises (id: text) + the edit's explicit NL
     delta text (_reviseqa_format_explicit_context — same text the QA
     model sees); output = {"ops": [...]} remove-by-id / add-(kind,text).
@@ -17,11 +15,7 @@ Identical config to the 15-scenario smoke
   - Edit-translation accuracy vs benchmark-native structured updates as
     ground truth (resolved on an identically-seeded native shadow).
 
-Scope: ALL 930 verified scenarios (same list/order as the two-arm full
-run, asserted at startup), INCLUDING the 15 smoke scenarios — re-run
-fresh here so every scenario in this output comes from one uniform run
-(the smoke used the identical config; its copies live separately in
-experiments/results/reviseqa_interp_smoke/).
+Scope: all 930 verified scenarios.
 
 Sharding: shard i of N takes scenarios[i::N] (interleaved, preserves
 global order coverage and balances load). Each shard checkpoints and
@@ -46,7 +40,7 @@ import re
 import sys
 import time
 
-PROJECT_DIR = "."
+PROJECT_DIR = os.environ.get("RQ_PROJECT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_DIR)
 
 from benchmark_adapter import (  # noqa: E402
@@ -65,7 +59,7 @@ from benchmark_adapter import (  # noqa: E402
     REVISEQA_PROMPT_TEMPLATE,
 )
 
-DATA_DIR = "datasets_cache/reviseqa/reviseqa_data/nl/verified"
+DATA_DIR = os.environ.get("RQ_DATA_DIR", os.path.join(PROJECT_DIR, "data", "reviseqa", "reviseqa_data", "nl", "verified"))
 REFERENCE_RUN = os.path.join(
     PROJECT_DIR, "experiments/results/reviseqa/"
     "reviseqa_full_qwen7b_explicit_no_corr_no_reasoning.json")
@@ -393,7 +387,7 @@ def main():
 
     interp_key = os.environ.get("OPENAI_API_KEY")
     if not interp_key:
-        print("ERROR: OPENAI_API_KEY not set (source .env.local).")
+        print("ERROR: OPENAI_API_KEY not set.")
         sys.exit(1)
     qa_key = "dummy"
 
@@ -405,11 +399,7 @@ def main():
         if [s["id"] for s in scenarios] != ref_ids:
             print("ERROR: scenario set/order mismatch vs reference run.")
             sys.exit(2)
-        # native two-arm records are copied alongside the interpreter trace
         native_by_id = {r["scenario_id"]: r for r in full["records"]}
-    else:
-        print(f"No reference two-arm run at {REFERENCE_RUN}; "
-              "order check skipped, native traces left empty.")
 
     shard = scenarios[args.shard_index::args.num_shards]
     print(f"Shard {args.shard_index}/{args.num_shards}: "
@@ -439,8 +429,7 @@ def main():
         "engine_block_mode": "dep_map_only_no_state_summary",
         "interpreter_input": ("tracked premises (id: text) + explicit NL "
                               "edit delta (_reviseqa_format_explicit_"
-                              "context), identical to the 15-scenario "
-                              "smoke"),
+                              "context)"),
         "initialization": "benchmark-native; interpreter only for edits",
         "ground_truth": ("benchmark-native structured updates on an "
                          "identically-seeded native shadow state"),
@@ -449,9 +438,6 @@ def main():
                      "rule": "scenarios[shard_index::num_shards] over the "
                              "same 930-scenario ordered list as the "
                              "two-arm full run"},
-        "smoke_overlap": ("the 15 smoke scenarios are INCLUDED and re-run "
-                          "fresh here (identical config to the smoke), so "
-                          "this output is one uniform 930-scenario run"),
         "pricing_assumed_usd_per_1M": {"input": PRICE_IN_PER_M,
                                        "output": PRICE_OUT_PER_M},
     }

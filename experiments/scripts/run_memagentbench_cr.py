@@ -35,13 +35,13 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Defaults are the original server paths; both can be overridden with
-# --project-dir / --data so the script also runs from a local checkout.
+# Defaults resolve relative to the repository root; both can be overridden
+# with CR_PROJECT_DIR / CR_DATA or --project-dir / --data.
 DEFAULT_PROJECT_DIR = os.environ.get(
-    "CR_PROJECT_DIR", ".")
+    "CR_PROJECT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DEFAULT_DATA = os.environ.get(
-    "CR_DATA", "datasets_cache/memoryagentbench/data/"
-               "Conflict_Resolution-00000-of-00001.parquet")
+    "CR_DATA", os.path.join(DEFAULT_PROJECT_DIR, "data", "memoryagentbench",
+                            "Conflict_Resolution-00000-of-00001.parquet"))
 # Backwards-compatible aliases: run_memagentbench_cr_e2e.py imports this
 # module and reads CR.DATA / CR.PROJECT_DIR directly.
 DATA = DEFAULT_DATA

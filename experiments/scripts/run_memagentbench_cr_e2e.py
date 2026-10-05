@@ -25,13 +25,15 @@ import argparse, json, os, sys, time, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 PROJECT_DIR = os.environ.get(
-    "CR_PROJECT_DIR", ".")
+    "CR_PROJECT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_DIR)
 sys.path.insert(0, os.path.join(PROJECT_DIR, "experiments", "scripts"))
 import run_memagentbench_cr as CR  # noqa: E402
 
 OUT_DIR = os.path.join(PROJECT_DIR, "experiments/results/memagentbench_cr")
-INGEST_PATH = os.path.join(OUT_DIR, "e2e_ingest_{length}.json")
+# Interpreter ingestion decisions (shipped; resumed, so no new calls are made)
+INGEST_PATH = os.path.join(PROJECT_DIR, "experiments/cache/memagentbench_cr",
+                           "e2e_ingest_{length}.json")
 
 INTERP_SYSTEM = (
     "You maintain a store of facts. Facts can be superseded: a NEW fact "
@@ -91,6 +93,7 @@ def phase_ingest(args):
         row_by_len.setdefault(length, t.column("context")[i].as_py())
     for length in args.lengths:
         out_path = INGEST_PATH.format(length=length)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
         cache = {}
         if os.path.exists(out_path) and not args.force_restart:
             cache = json.load(open(out_path)).get("decisions", {})
@@ -159,6 +162,7 @@ def phase_qa(args):
     class A: pass
     qa = A(); qa.base_url = args.qa_base_url; qa.model = args.qa_model
     qa.key = os.environ.get(args.api_key_env, "dummy")
+    os.makedirs(OUT_DIR, exist_ok=True)
     out_path = os.path.join(OUT_DIR, f"cr_{args.tag}_e2e.json")
     state = {}
     if os.path.exists(out_path) and not args.force_restart:

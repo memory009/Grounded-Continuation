@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
 Symbolic Epistemic Engine — Reference Implementation
-Grounded Continuation runtime verifier (ICLR 2027 submission)
 
 This module implements the core symbolic engine described in the paper:
 - Hypothesis lifecycle tracking (active → weakened → abandoned → resolved)
 - Observation registry with explanatory links
 - Dependency tracking: Dep(hypothesis) → {assumptions}
-- Counterfactual reasoning: Affected(assumption) via Proposition 1
+- Counterfactual reasoning: Affected(assumption) (dependency soundness)
 - Awareness set management
 - Consistency checking
 
@@ -75,7 +74,7 @@ class EngineEvent:
 class EpistemicEngine:
     """
     The symbolic engine that maintains the epistemic model.
-    Implements the formal framework from Section 3 of the paper.
+    Implements the formal framework of the paper.
     """
 
     def __init__(self, ablate_del_awareness: bool = False):
@@ -94,7 +93,7 @@ class EpistemicEngine:
         # the status lifecycle (active/weakened/abandoned/resolved),
         # the dependency map Dep(), and attack/undermine edges.
         self.ablate_del_awareness = ablate_del_awareness
-        # Acyclicity guard (Prop 2.2). Default
+        # Acyclicity guard. Default
         # off: with check_acyclicity=False the update path is unchanged
         # (a single boolean test per edge-adding op). When on, every
         # edge-adding operation re-runs cycle detection and, if a cycle
@@ -104,7 +103,7 @@ class EpistemicEngine:
         self.cycle_flags: list[dict] = []
 
     # --------------------------------------------------------
-    # Epistemic Operations (Section 3.5)
+    # Epistemic Operations
     # --------------------------------------------------------
 
     def observe(self, obs_id: str, content: str, turn: str, speaker: str):
@@ -213,7 +212,7 @@ class EpistemicEngine:
         self.history.append(EngineEvent("Question", turn, {"content": content}))
 
     # --------------------------------------------------------
-    # Dependency Tracking (Proposition 1: Soundness)
+    # Dependency Tracking (dependency soundness)
     # --------------------------------------------------------
 
     def get_affected(self, assumption_id: str) -> list[str]:
@@ -256,7 +255,7 @@ class EpistemicEngine:
     def retract_assumption(self, assumption_id: str, transitive: bool = True) -> dict:
         """
         Simulate retracting an assumption and compute the impact.
-        Implements Proposition 1: S' = S \ Affected(p) is conflict-free.
+        S' = S \ Affected(p) is conflict-free (dependency soundness).
 
         Returns a structured report of what changes and what doesn't.
         """
@@ -285,7 +284,7 @@ class EpistemicEngine:
         return result
 
     # --------------------------------------------------------
-    # Cycle Detection (Prop 2.2 acyclicity guard)
+    # Cycle Detection (acyclicity guard)
     # --------------------------------------------------------
 
     def attack_edge_view(self) -> list[tuple[str, str]]:
@@ -463,8 +462,7 @@ class EpistemicEngine:
 # Phase 2 Scenario
 # ============================================================
 
-# Module-level Phase 2 turn list — referenced by run_phase2() and reused by
-# E5 (experiments/e5_robustness/run_e5.py) for per-truncation engine builds.
+# Module-level Phase 2 turn list, referenced by run_phase2().
 # Each tuple is (turn_id, speaker, text, apply_fn). apply_fn(engine) mutates
 # the engine in place; its return value (a list of Nones) is discarded.
 PHASE2_TURNS = [

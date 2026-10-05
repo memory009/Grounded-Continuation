@@ -57,7 +57,7 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-PROJECT_DIR = "."
+PROJECT_DIR = os.environ.get("RQ_PROJECT_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, PROJECT_DIR)
 
 from benchmark_adapter import (  # noqa: E402
@@ -72,7 +72,7 @@ from benchmark_adapter import (  # noqa: E402
     REVISEQA_PROMPT_TEMPLATE,
 )
 
-DATA_DIR = "datasets_cache/reviseqa/reviseqa_data/nl/verified"
+DATA_DIR = os.environ.get("RQ_DATA_DIR", os.path.join(PROJECT_DIR, "data", "reviseqa", "reviseqa_data", "nl", "verified"))
 REFERENCE_RUN = os.path.join(
     PROJECT_DIR, "experiments/results/reviseqa/"
     "reviseqa_full_qwen7b_explicit_no_corr_no_reasoning.json")
