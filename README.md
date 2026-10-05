@@ -1,7 +1,7 @@
 # Grounded Continuation: Runtime Verifier — Code Release
 
 <video src="./grounded-continuation-demo.mp4" controls width="100%">
-  Your browser does not support the video tag. [Download the demo video](./assets/grounded-continuation-demo.mp4).
+  Your browser does not support the video tag. [Download the demo video](./grounded-continuation-demo.mp4).
 </video>
 
 Code accompanying the paper
