@@ -1,5 +1,9 @@
 # Grounded Continuation: Runtime Verifier — Code Release
 
+<video src="./assets/grounded-continuation-demo.mp4" controls width="100%">
+  Your browser does not support the video tag. [Download the demo video](./assets/grounded-continuation-demo.mp4).
+</video>
+
 Code accompanying the paper
 **"Grounded Continuation: A Linear-Time Runtime Verifier for LLM Conversations"**.
 
@@ -46,6 +50,7 @@ export VLLM_API_KEY=dummy         # any value; local vLLM endpoints do not check
 Which keys a run needs depends on the models chosen. The engine, the latency
 benchmark and `run_recon_oracle.py` need none. With the recorded Interpreter
 outputs in `experiments/cache/`, the end-to-end arms need no OpenAI key when
+
 the QA model is served locally.
 
 ### 3. Serving the open-weight models
